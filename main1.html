@@ -49,13 +49,53 @@
         <li>私を冷静でいさせてくれる歌詞とサウンド</li>
       </ul>
 
-      <h2>おすすめ曲</h2>
-      <ol>
-        <li>Группа крови(血液型)</li>
-        <li>Звезда по имени Солнце(太陽という名の星)</li>
-        <li>Закрой за мной дверь я ухожу(ドアを閉めてくれ、もう出て行くから)</li>
-      </ol>
+      <!-- ★ここから：音楽プレーヤーを追加（融合ポイント） -->
+      <h2>おすすめ曲（再生できます）</h2>
 
+      <!-- JSで制御するので controls は無し -->
+      <audio id="player" preload="metadata"></audio>
+
+      <div class="player">
+        <div class="player-row">
+          <button id="btnToggle" type="button">▶ 再生</button>
+          <button id="btnStop" type="button">■ 停止</button>
+          <span id="nowPlaying" class="now-playing">未選択</span>
+          <span id="time" class="time">0:00 / 0:00</span>
+        </div>
+
+        <div class="player-row">
+          <label class="label"></label>
+          <input id="seek" type="range" min="0" max="1000" value="0">
+        </div>
+
+        <div class="player-row">
+          <label class="label">音量</label>
+          <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8">
+        </div>
+
+        <ol class="tracklist">
+          <li>
+            <button class="track" type="button"
+              data-src="audio/Gruppa_krovi_na_rukave.mp3"
+              data-title="Группа крови(血液型)">再生</button>
+            <span>Группа крови(血液型)</span>
+          </li>
+          <li>
+            <button class="track" type="button"
+              data-src="audio/Zvezda_po_imeni_Solnce.mp3"
+              data-title="Звезда по имени Солнце(太陽という名の星)">再生</button>
+            <span>Звезда по имени Солнце(太陽という名の星)</span>
+          </li>
+          <li>
+            <button class="track" type="button"
+              data-src="audio/Zakroy_za_mnoy_dver_ya_uhodzhu.mp3"
+              data-title="Закрой за мной дверь я ухожу(ドアを閉めてくれ、もう出て行くから)">再生</button>
+            <span>Закрой за мной дверь я ухожу(ドアを閉めてくれ、もう出て行くから)</span>
+          </li>
+        </ol>
+      </div>
+      <!-- ★ここまで：音楽プレーヤー -->
+      
       <p><a class="back" href="index.html">← ホームに戻る</a></p>
 
       <hr>
@@ -63,5 +103,121 @@
     </div>
   </div>
 
+  <script>
+    const audio = document.getElementById("player");
+    const btnToggle = document.getElementById("btnToggle");
+    const btnStop = document.getElementById("btnStop");
+    const nowPlaying = document.getElementById("nowPlaying");
+    const timeEl = document.getElementById("time");
+    const seek = document.getElementById("seek");
+    const vol = document.getElementById("vol");
+    const trackButtons = document.querySelectorAll(".track");
+
+    const fmt = (sec) => {
+      if (!Number.isFinite(sec)) return "0:00";
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${String(s).padStart(2, "0")}`;
+    };
+
+    function updateToggleUI() {
+      btnToggle.textContent = audio.paused ? "▶ 再生" : "⏸ 一時停止";
+    }
+
+    async function playSafe() {
+      try {
+        await audio.play(); // ユーザー操作内で呼べば自動再生制限に強い
+      } catch (e) {
+        console.error(e);
+        alert("再生できませんでした。音声ファイルのパス/形式、またはブラウザ制限を確認してください。");
+      }
+    }
+
+    // 音量
+    audio.volume = Number(vol.value);
+    vol.addEventListener("input", () => {
+      audio.volume = Number(vol.value);
+    });
+
+    // 再生/一時停止
+    btnToggle.addEventListener("click", () => {
+      if (!audio.src) {
+        alert("まず曲を選んでください（下の「再生」ボタン）。");
+        return;
+      }
+      if (audio.paused) playSafe();
+      else audio.pause();
+      updateToggleUI();
+    });
+
+    // 停止（先頭へ）
+    btnStop.addEventListener("click", () => {
+      audio.pause();
+      audio.currentTime = 0;
+      updateToggleUI();
+    });
+
+    // 曲選択（各「再生」ボタン）
+    trackButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const src = btn.dataset.src;
+        const title = btn.dataset.title || "再生中";
+        if (!src) return;
+
+        // 同じ曲を押したらトグル挙動
+        const isSame = audio.src && audio.src.endsWith(src);
+        if (isSame) {
+          if (audio.paused) await playSafe();
+          else audio.pause();
+          updateToggleUI();
+          return;
+        }
+
+        audio.src = src;
+        nowPlaying.textContent = `♪ ${title}`;
+        audio.currentTime = 0;
+
+        // 他のボタン表示を整える（任意）
+        trackButtons.forEach(b => b.classList.remove("is-playing"));
+        btn.classList.add("is-playing");
+
+        await playSafe();
+        updateToggleUI();
+      });
+    });
+
+    // 時間・シーク
+    let isSeeking = false;
+
+    audio.addEventListener("loadedmetadata", () => {
+      timeEl.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+    });
+
+    audio.addEventListener("timeupdate", () => {
+      if (!audio.duration) return;
+      timeEl.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+      if (!isSeeking) {
+        seek.value = Math.floor((audio.currentTime / audio.duration) * Number(seek.max));
+      }
+    });
+
+    seek.addEventListener("pointerdown", () => { isSeeking = true; });
+    seek.addEventListener("pointerup", () => { isSeeking = false; });
+
+    seek.addEventListener("input", () => {
+      if (!audio.duration) return;
+      const ratio = Number(seek.value) / Number(seek.max);
+      audio.currentTime = ratio * audio.duration;
+    });
+
+    audio.addEventListener("play", updateToggleUI);
+    audio.addEventListener("pause", updateToggleUI);
+    audio.addEventListener("ended", () => {
+      updateToggleUI();
+      trackButtons.forEach(b => b.classList.remove("is-playing"));
+    });
+
+    updateToggleUI();
+  </script>
 </body>
 </html>
