@@ -1,2 +1,2 @@
 # My-treasure-box
-# 授業で作ったオリジナルサイトです。
+# 授業で作ったオリジナルサイトです。# hoshizora-navi
